@@ -166,6 +166,28 @@ class HelpPage extends StatelessWidget {
                   ],
                 ),
                 _buildSubsection(
+                  "⚠️ Remarque : Connexion pour la calibration",
+                  [
+                    "La calibration peut se faire via deux méthodes de connexion :",
+                    "",
+                    "🔌 Option 1 — Câble USB (PC → Pixhawk) :",
+                    "   • Connexion directe et la plus stable",
+                    "   • Recommandée pour la configuration initiale et les calibrations",
+                    "   • Débit élevé, pas de risque de perte de signal",
+                    "   • Baud rate : 115200",
+                    "",
+                    "📡 Option 2 — Module de télémétrie (Émetteur-Récepteur) :",
+                    "   • Connexion sans fil, utile sur le terrain",
+                    "   • Fonctionne comme un câble USB virtuel une fois configuré",
+                    "   • Baud rate : 57600 (par défaut)",
+                    "   • Assurez-vous que le lien radio est stable avant de calibrer",
+                    "",
+                    "✅ Recommandation : Utilisez le câble USB pour les calibrations initiales et critiques. Le module télémétrie peut être utilisé pour des ajustements rapides sur le terrain si le signal est stable.",
+                    "",
+                    "⚠️ Sécurité : Retirez TOUJOURS les hélices avant toute calibration, quelle que soit la méthode de connexion utilisée.",
+                  ],
+                ),
+                _buildSubsection(
                   "Calibration du Gyroscope",
                   [
                     "1. Immobilisez complètement le drone",
