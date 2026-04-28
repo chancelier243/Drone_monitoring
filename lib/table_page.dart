@@ -1,11 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:excel/excel.dart';
 import 'package:path_provider/path_provider.dart';
 import 'telemetry_service.dart';
-import 'data_model.dart';
 import 'theme_provider.dart';
+import 'file_handler.dart';
 
 class TablePage extends StatelessWidget {
   const TablePage({super.key});
@@ -23,64 +22,6 @@ class TablePage extends StatelessWidget {
     } else {
       // Sur Android et autres, utiliser getApplicationDocumentsDirectory
       return await getApplicationDocumentsDirectory();
-    }
-  }
-
-  Future<void> _exportToExcel(BuildContext context, List<TelemetryData> history) async {
-    try {
-      var excel = Excel.createExcel();
-      Sheet sheetObject = excel['Telemetry'];
-      excel.delete('Sheet1');
-
-      List<String> headers = [
-        "Temps", "Altitude (m)", "Vitesse (m/s)", "Temp (°C)", "Batterie (V)", 
-        "Pitch", "Roll", "Yaw", "Accel X", "Accel Y", "Accel Z", "Pression (hPa)"
-      ];
-      sheetObject.appendRow(headers.map((e) => TextCellValue(e)).toList());
-
-      for (var data in history) {
-        sheetObject.appendRow([
-          TextCellValue(data.timestamp.toIso8601String()),
-          DoubleCellValue(data.altitude),
-          DoubleCellValue(data.speed),
-          DoubleCellValue(data.temperature),
-          DoubleCellValue(data.battery),
-          DoubleCellValue(data.pitch),
-          DoubleCellValue(data.roll),
-          DoubleCellValue(data.yaw),
-          DoubleCellValue(data.accelX),
-          DoubleCellValue(data.accelY),
-          DoubleCellValue(data.accelZ),
-          DoubleCellValue(data.pressure),
-        ]);
-      }
-
-      final fileBytes = excel.save();
-      if (fileBytes == null) throw Exception("Erreur de génération Excel");
-
-      final directory = await _getExportDirectory();
-      final fileName = 'telemetrie_drone_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-      final separator = Platform.isWindows ? '\\' : '/';
-      final filePath = '${directory.path}$separator$fileName';
-      
-      final file = File(filePath);
-      await file.writeAsBytes(fileBytes);
-
-      if (context.mounted) {
-        String message = Platform.isWindows
-            ? "Fichier sauvegardé dans le dossier Téléchargements:\n$fileName"
-            : "Fichier sauvegardé:\n$fileName\n\nDossier: ${directory.path}";
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur lors de l'export: $e")),
-        );
-      }
     }
   }
 
@@ -205,6 +146,102 @@ class TablePage extends StatelessWidget {
     );
   }
 
+  void _showExportMenu(BuildContext context, TelemetryService service) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Exporter les données",
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.table_chart),
+              title: const Text("Excel (.xlsx)"),
+              subtitle: const Text("Format compatible avec Microsoft Excel"),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportWithFileHandler(context, service, 'excel');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text("CSV (.csv)"),
+              subtitle: const Text("Format texte universel"),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportWithFileHandler(context, service, 'csv');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text("JSON (.json)"),
+              subtitle: const Text("Format JSON structuré"),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportWithFileHandler(context, service, 'json');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.web),
+              title: const Text("Rapport HTML"),
+              subtitle: const Text("Rapport complet avec graphiques"),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportWithFileHandler(context, service, 'html');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportWithFileHandler(BuildContext context, TelemetryService service, String format) async {
+    try {
+      File? file;
+      String formatName = '';
+
+      switch (format) {
+        case 'excel':
+          file = await FileHandler.exportToExcel(service.history);
+          formatName = 'Excel';
+          break;
+        case 'csv':
+          file = await FileHandler.exportToCSV(service.history);
+          formatName = 'CSV';
+          break;
+        case 'json':
+          file = await FileHandler.exportToJSON(service.history);
+          formatName = 'JSON';
+          break;
+        case 'html':
+          file = await FileHandler.generateHTMLReport(service.history);
+          formatName = 'Rapport HTML';
+          break;
+      }
+
+      if (file != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("$formatName exporté avec succès:\n${file.path}"),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur export: $e")),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -303,24 +340,24 @@ class TablePage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               FloatingActionButton.small(
-                onPressed: () => _clearHistory(context),
-                backgroundColor: Colors.red,
-                tooltip: "Supprimer les données",
-                child: const Icon(Icons.delete_sweep),
+                onPressed: () => _showExportMenu(context, service),
+                backgroundColor: Colors.green,
+                tooltip: "Exporter les données",
+                child: const Icon(Icons.save_alt),
               ),
               const SizedBox(height: 12),
               FloatingActionButton.small(
                 onPressed: () => _importExcel(context),
                 backgroundColor: Colors.blueAccent,
-                tooltip: "Importer Excel",
+                tooltip: "Importer données",
                 child: const Icon(Icons.upload_file),
               ),
               const SizedBox(height: 12),
-              FloatingActionButton.extended(
-                onPressed: () => _exportToExcel(context, service.history),
-                label: const Text("Télécharger Excel"),
-                icon: const Icon(Icons.download),
-                backgroundColor: Colors.green,
+              FloatingActionButton.small(
+                onPressed: () => _clearHistory(context),
+                backgroundColor: Colors.red,
+                tooltip: "Supprimer les données",
+                child: const Icon(Icons.delete_sweep),
               ),
             ],
           ),

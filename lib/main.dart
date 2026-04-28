@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'telemetry_service.dart';
 import 'theme_provider.dart';
+import 'calibration_service.dart';
 import 'mission_control_page.dart';
 import 'charts_page.dart';
 import 'table_page.dart';
 import 'settings_page.dart';
+import 'calibration_page.dart';
+import 'help_page.dart';
 import 'manual_data_dialog.dart';
 
 void main() {
@@ -14,6 +17,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => TelemetryService()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => CalibrationService()),
       ],
       child: const MyApp(),
     ),
@@ -68,7 +72,27 @@ class _MainLayoutState extends State<MainLayout> {
     const MissionControlPage(),
     const ChartsPage(),
     const TablePage(),
+    const CalibrationPage(),
     const SettingsPage(),
+    const HelpPage(),
+  ];
+
+  final List<String> _pageNames = [
+    'Mission Control',
+    'Graphiques',
+    'Tableau',
+    'Calibration',
+    'Paramètres',
+    'Aide',
+  ];
+
+  final List<IconData> _pageIcons = [
+    Icons.dashboard,
+    Icons.show_chart,
+    Icons.table_chart,
+    Icons.settings_input_component,
+    Icons.settings,
+    Icons.help_outline,
   ];
 
   @override
@@ -78,14 +102,14 @@ class _MainLayoutState extends State<MainLayout> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Drone Monitoring"),
+        title: Text("Drone Monitoring - ${_pageNames[_currentIndex]}"),
         backgroundColor: Theme.of(context).brightness == Brightness.dark 
             ? Colors.grey[900] 
             : Colors.blueAccent,
         foregroundColor: Colors.white,
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               if (value == 'theme') {
                 themeProvider.toggleTheme();
@@ -134,36 +158,20 @@ class _MainLayoutState extends State<MainLayout> {
         ],
       ),
       body: _pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) {
           setState(() {
             _currentIndex = index;
           });
         },
-        selectedItemColor: themeProvider.seedColor,
-        unselectedItemColor: Colors.grey,
-        backgroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? Colors.grey[900] 
-            : Colors.grey[100],
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.show_chart),
-            label: 'Graphiques',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.table_chart),
-            label: 'Tableau',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Paramètres',
-          ),
-        ],
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        destinations: List.generate(_pageNames.length, (index) {
+          return NavigationDestination(
+            icon: Icon(_pageIcons[index]),
+            label: _pageNames[index],
+          );
+        }),
       ),
     );
   }
