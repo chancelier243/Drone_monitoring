@@ -134,12 +134,12 @@ class TelemetryService extends ChangeNotifier {
       }
     } on TimeoutException {
       isConnected = false;
-      errorMessage = "Connexion expiree (timeout 8s)";
+      errorMessage = "Connexion expirée (timeout 8s)";
       failedAttempts++;
       notifyListeners();
     } on FormatException {
       isConnected = false;
-      errorMessage = "Reponse invalide (pas du JSON). Verifiez l'URL.";
+      errorMessage = "Réponse invalide (pas du JSON). Vérifiez l'URL.";
       failedAttempts++;
       notifyListeners();
     } catch (e) {
@@ -149,7 +149,7 @@ class TelemetryService extends ChangeNotifier {
       if (msg.contains('SocketException') ||
           msg.contains('Connection refused')) {
         errorMessage =
-            "Serveur injoignable. Verifiez l'URL et que le serveur tourne.";
+            "Serveur injoignable. Vérifiez l'URL et que le serveur tourne.";
       } else if (msg.contains('HandshakeException') ||
           msg.contains('CERTIFICATE')) {
         errorMessage = "Erreur SSL/HTTPS. Essayez avec http:// a la place.";
