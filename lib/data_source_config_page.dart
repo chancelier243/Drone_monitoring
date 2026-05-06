@@ -167,7 +167,7 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                             const SizedBox(height: 16),
                             // Mode de connexion
                             DropdownButtonFormField<ConnectionMode>(
-                              value: _selectedMode,
+                              initialValue: _selectedMode,
                               decoration: InputDecoration(
                                 labelText: 'Mode de Connexion',
                                 prefixIcon: const Icon(Icons.settings_input_composite),
@@ -289,20 +289,19 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                               width: double.infinity,
                               child: ElevatedButton.icon(
                                 onPressed: () async {
+                                  final messenger = ScaffoldMessenger.of(context);
                                   await telemetryService.threeDRService
                                       .connectToThreeDR();
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          telemetryService.threeDRService
-                                                  .isConnected
-                                              ? 'Connecté au module 3DR'
-                                              : 'Erreur: ${telemetryService.threeDRService.errorMessage}',
-                                        ),
+                                  if (!mounted) return;
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        telemetryService.threeDRService.isConnected
+                                            ? 'Connecté au module 3DR'
+                                            : 'Erreur: ${telemetryService.threeDRService.errorMessage}',
                                       ),
-                                    );
-                                  }
+                                    ),
+                                  );
                                 },
                                 icon: const Icon(Icons.power_settings_new),
                                 label: const Text('Connecter au Module 3DR'),

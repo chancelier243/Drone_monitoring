@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'data_model.dart';
 
@@ -118,7 +116,8 @@ class ThreeDRService extends ChangeNotifier {
   }
 
   /// Parse MAVLink protocol packet
-  /// Format: "$100<LENGTH><SEQ><SYSID><COMPID><MSGID><PAYLOAD><CRC>"
+  /// Format: `$100<LENGTH><SEQ><SYSID><COMPID><MSGID><PAYLOAD><CRC>`
+  // ignore: unused_element
   TelemetryData? _parseMAVLinkPacket(Uint8List packet) {
     try {
       if (packet.isEmpty || packet[0] != 0xFE) {
@@ -127,6 +126,9 @@ class ThreeDRService extends ChangeNotifier {
 
       // Basic MAVLink frame parsing
       final length = packet[1];
+      if (packet.length < 6 + length) {
+        return null;
+      }
       final msgId = packet[5];
 
       // Parse different MAVLink message types
