@@ -4,12 +4,23 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:excel/excel.dart' as excel_lib;
 import 'data_model.dart';
+import 'three_dr_service.dart';
+
+/// Source de données pour la télémétrie du drone
+enum DataSource { server, threeDR }
 
 class TelemetryService extends ChangeNotifier {
   TelemetryData? currentData;
   List<TelemetryData> history = [];
   Timer? _timer;
   int? scrubbedIndex; // Index survolé sur le graphique
+
+  // Source de données actuelle
+  DataSource _dataSource = DataSource.server;
+  DataSource get dataSource => _dataSource;
+  
+  // Service pour module 3DR
+  late ThreeDRService threeDRService;
 
   void setScrubbedIndex(int? index) {
     scrubbedIndex = index;
@@ -34,6 +45,7 @@ class TelemetryService extends ChangeNotifier {
   int failedAttempts = 0;
 
   TelemetryService() {
+    threeDRService = ThreeDRService();
     startFetching();
   }
 
@@ -64,11 +76,78 @@ class TelemetryService extends ChangeNotifier {
     fetchTelemetry(); // Lance immédiatement une tentative de connexion
   }
 
+  /// Bascule la source de données entre serveur et module 3DR
+  Future<void> switchDataSource(DataSource newSource) async {
+    if (_dataSource == newSource) return;
+    
+    _dataSource = newSource;
+    failedAttempts = 0;
+    errorMessage = "";
+    history.clear();
+    currentData = null;
+    
+    if (newSource == DataSource.threeDR) {
+      await threeDRService.connectToThreeDR();
+    } else {
+      await threeDRService.disconnectFromThreeDR();
+    }
+    
+    notifyListeners();
+  }
+
+  /// Configure le module 3DR
+  void configureThreeDR({
+    required ThreeDRService.ConnectionMode mode,
+    String? port,
+    int? baudRate,
+    String? host,
+    int? remotePort,
+  }) {
+    threeDRService.configureConnection(
+      mode: mode,
+      port: port,
+      baud: baudRate,
+      host: host,
+      remPort: remotePort,
+    );
+  }
+
   void startFetching() {
     // Interrogation toutes les 1 seconde
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      await fetchTelemetry();
+      if (_dataSource == DataSource.server) {
+        await fetchTelemetry();
+      } else {
+        _fetchFromThreeDR();
+      }
     });
+  }
+
+  /// Récupère les données depuis le module 3DR
+  void _fetchFromThreeDR() {
+    try {
+      // Copie les données du service 3DR
+      if (threeDRService.currentData != null) {
+        currentData = threeDRService.currentData;
+        history.addAll(threeDRService.history
+            .where((data) => !history.contains(data)));
+        
+        // Limiter l'historique
+        if (history.length > 300) {
+          history.removeRange(0, history.length - 300);
+        }
+        
+        isConnected = threeDRService.isConnected;
+        errorMessage = threeDRService.errorMessage;
+        failedAttempts = threeDRService.failedAttempts;
+        
+        notifyListeners();
+      }
+    } catch (e) {
+      if (kDebugMode) print("Erreur récupération données 3DR: $e");
+      errorMessage = "Erreur lecture données 3DR: $e";
+      notifyListeners();
+    }
   }
 
   Future<void> fetchTelemetry() async {
@@ -314,6 +393,7 @@ class TelemetryService extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    threeDRService.dispose();
     super.dispose();
   }
 }

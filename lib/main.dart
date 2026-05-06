@@ -10,6 +10,7 @@ import 'settings_page.dart';
 import 'calibration_page.dart';
 import 'help_page.dart';
 import 'manual_data_dialog.dart';
+import 'data_source_config_page.dart';
 
 void main() {
   runApp(

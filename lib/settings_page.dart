@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
+import 'data_source_config_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -147,6 +148,43 @@ class SettingsPage extends StatelessWidget {
                     Text(
                       "Les données seront affichées avec ${themeProvider.decimalPlaces} décimales",
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Configuration des sources de données ──
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Sources de Données", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "Configurez la source de télémétrie du drone:\n"
+                      "• Serveur HTTP\n"
+                      "• Module radio FPV 3DR",
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const DataSourceConfigPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.settings_input_composite),
+                        label: const Text("Configurer les sources"),
+                      ),
                     ),
                   ],
                 ),
