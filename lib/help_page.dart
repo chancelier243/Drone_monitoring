@@ -65,6 +65,95 @@ class HelpPage extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
+            // 1b. Module de télémétrie
+            _buildSection(
+              context,
+              "1b. Module de Télémétrie et Mode de Connexion",
+              [
+                _buildSubsection(
+                  "Qu'est-ce que le module de télémétrie?",
+                  [
+                    "Le module de télémétrie est le cœur de l'application",
+                    "Il reçoit les données du drone en temps réel via le serveur",
+                    "Fréquence de mise à jour: 1 Hz (1 mesure par seconde)",
+                    "Les données sont stockées dans un historique (50 dernières mesures)",
+                    "L'interface se met à jour automatiquement à chaque nouvelle donnée",
+                  ],
+                ),
+                _buildSubsection(
+                  "Accès au mode de connexion",
+                  [
+                    "1. Ouvrez l'application et allez à l'onglet 'Mission Control'",
+                    "2. Si aucune donnée n'est reçue, vous verrez l'écran de connexion",
+                    "3. Cet écran affiche: ☁️ Non connecté au serveur",
+                    "4. Un formulaire de configuration du serveur s'affiche",
+                    "5. C'est ici que vous entrez l'URL pour se connecter au module de télémétrie",
+                  ],
+                ),
+                _buildSubsection(
+                  "Configuration de l'URL du serveur",
+                  [
+                    "Format générique: http://IP_SERVEUR:PORT",
+                    "Exemple local: http://localhost:5000 ou http://127.0.0.1:5000",
+                    "Exemple réseau: http://192.168.1.100:5000",
+                    "Exemple IPv4: http://10.0.0.5:8000",
+                    "Support localtunnel: http://monapp.loca.lt (utile pour l'accès à distance)",
+                    "Port par défaut du serveur: 5000",
+                    "⚠️ Assurez-vous que http:// est présent (pas https si non supporté)",
+                  ],
+                ),
+                _buildSubsection(
+                  "Étapes pour se connecter",
+                  [
+                    "1. Vérifiez que le serveur Python (server.py) est actif",
+                    "2. Notez l'IP du serveur (http://IP:PORT)",
+                    "3. Dans l'écran de connexion, effacez l'URL actuelle",
+                    "4. Entrez la nouvelle URL (ex: http://192.168.1.100:5000)",
+                    "5. Cliquez sur le bouton 'Se connecter' (bleu)",
+                    "6. L'application va tenter la connexion automatiquement",
+                    "7. Attendez quelques secondes pour la première réponse",
+                    "8. Si réussi, un horizon artificiel s'affichera",
+                  ],
+                ),
+                _buildSubsection(
+                  "Qu'est-ce que le module reçoit du serveur?",
+                  [
+                    "📍 Position: Latitude, Longitude, Altitude",
+                    "🎯 Attitude: Pitch (tangage), Roll (roulis), Yaw (cap/lacet)",
+                    "⚡ Vitesse: Vitesse actuelle du drone (m/s)",
+                    "🔋 Batterie: Tension actuelle (V)",
+                    "🌡️ Température: Capteur interne (°C)",
+                    "📊 Capteurs: Gyroscope, Accéléromètre, Magnétomètre (3 axes)",
+                    "📈 Pression: Pression atmosphérique (Pa ou hPa)",
+                    "⚠️ Alertes: Avertissements en cas de seuil dépassé",
+                  ],
+                ),
+                _buildSubsection(
+                  "Endpoint du serveur",
+                  [
+                    "Endpoint principal: /latest-data",
+                    "Fréquence: L'application interroge toutes les 1 seconde",
+                    "Format de réponse: JSON",
+                    "Le serveur doit toujours répondre avec la dernière donnée",
+                    "Exemple: {\"pitch\": 5.2, \"roll\": -3.1, \"yaw\": 45.0, ...}",
+                  ],
+                ),
+                _buildSubsection(
+                  "Gestion des erreurs de connexion",
+                  [
+                    "❌ 'Non connecté': Vérifiez l'URL et que le serveur est actif",
+                    "❌ 'Timeout': Le serveur met trop de temps à répondre (8s max)",
+                    "❌ 'Reponse invalide': Le serveur retourne du HTML au lieu de JSON",
+                    "❌ 'Acces refuse (403)': L'URL est peut-être mal formatée",
+                    "💡 Pour localtunnel: Visitez l'URL dans un navigateur d'abord",
+                    "🔄 L'application réessaie automatiquement toutes les secondes",
+                    "📊 Compteur 'Tentatives echouees' montre le nombre de reconnexions",
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
             // 2. Mission Control
             _buildSection(
               context,
@@ -327,19 +416,49 @@ class HelpPage extends StatelessWidget {
                 _buildSubsection(
                   "Pas de connexion au serveur",
                   [
-                    "Vérifiez que le serveur est actif",
-                    "Vérifiez l'URL (http://IP:PORT)",
-                    "Vérifiez le pare-feu et la connexion réseau",
-                    "Pour localtunnel: visitez l'URL dans un navigateur d'abord",
+                    "✓ Vérifiez que le serveur Python (server.py) est actif",
+                    "✓ Lancez: python server.py ou python3 server.py",
+                    "✓ Vérifiez l'URL (http://IP:PORT), ex: http://192.168.1.100:5000",
+                    "✓ Vérifiez le pare-feu et la connexion réseau",
+                    "✓ Ping l'IP pour vérifier la connectivité: ping 192.168.1.100",
+                    "✓ Vérifiez le port (5000 par défaut) en accédant à http://IP:5000 dans un navigateur",
+                    "✓ Pour localtunnel: visitez l'URL dans un navigateur d'abord",
+                    "✓ Attendez au moins 8 secondes avant de relancer la tentative",
                   ],
                 ),
                 _buildSubsection(
-                  "Données instables",
+                  "Module télémétrie et réception de données",
                   [
-                    "Calibrez les capteurs (Gyro, Accel, Mag)",
-                    "Éloignez-vous des sources magnétiques",
-                    "Vérifiez les branchements des capteurs",
-                    "Vérifiez la température (dérive thermique possible)",
+                    "Si connexion OK mais pas de données:",
+                    "  1. Vérifiez que le serveur expose l'endpoint /latest-data",
+                    "  2. Testez dans un navigateur: http://IP:PORT/latest-data",
+                    "  3. Vous devez voir une réponse JSON avec les données du drone",
+                    "  4. Si HTML au lieu de JSON: erreur de serveur",
+                    "Si les données arrivent mais ne changent pas:",
+                    "  1. Le drone n'envoie peut-être pas de nouvelles données",
+                    "  2. Vérifiez que le drone est actif et relie au serveur",
+                    "  3. Vérifiez la fréquence de mise à jour (1 Hz attendu)",
+                  ],
+                ),
+                _buildSubsection(
+                  "L'horizon artificiel ne s'affiche pas",
+                  [
+                    "  • Vérifiez d'abord la connexion au module de télémétrie",
+                    "  • Attendez que le statut 'Connecté' (vert) s'affiche",
+                    "  • Les données Pitch, Roll, Yaw doivent être reçues",
+                    "  • Si vides: le serveur n'envoie pas ces champs",
+                    "  • Vérifiez le format JSON du serveur",
+                  ],
+                ),
+                _buildSubsection(
+                  "Données instables ou saccadées",
+                  [
+                    "  • Calibrez les capteurs (Gyro, Accel, Mag) sur le drone",
+                    "  • Éloignez-vous de sources magnétiques",
+                    "  • Vérifiez la connexion réseau (Wi-Fi ou filaire)",
+                    "  • Si réseau Wi-Fi instable, utilisez un câble réseau",
+                    "  • Vérifiez la latence: ping -t IP_SERVEUR",
+                    "  • Réduisez les interférences radio",
                   ],
                 ),
                 _buildSubsection(
@@ -451,6 +570,7 @@ class HelpPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _tocItem("1. Démarrage Rapide"),
+            _tocItem("1b. Module de Télémétrie et Connexion"),
             _tocItem("2. Onglet Mission Control"),
             _tocItem("3. Onglet Charts"),
             _tocItem("4. Onglet Tableau"),
