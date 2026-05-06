@@ -16,7 +16,7 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
   late TextEditingController _hostController;
   late TextEditingController _remotePortController;
   
-  ThreeDRService.ConnectionMode _selectedMode = ThreeDRService.ConnectionMode.udp;
+  ConnectionMode _selectedMode = ConnectionMode.udp;
 
   @override
   void initState() {
@@ -166,7 +166,7 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                             ),
                             const SizedBox(height: 16),
                             // Mode de connexion
-                            DropdownButtonFormField<ThreeDRService.ConnectionMode>(
+                            DropdownButtonFormField<ConnectionMode>(
                               value: _selectedMode,
                               decoration: InputDecoration(
                                 labelText: 'Mode de Connexion',
@@ -177,15 +177,15 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                               ),
                               items: [
                                 DropdownMenuItem(
-                                  value: ThreeDRService.ConnectionMode.serial,
+                                  value: ConnectionMode.serial,
                                   child: const Text('Port Série (USB)'),
                                 ),
                                 DropdownMenuItem(
-                                  value: ThreeDRService.ConnectionMode.udp,
+                                  value: ConnectionMode.udp,
                                   child: const Text('UDP (Réseau)'),
                                 ),
                                 DropdownMenuItem(
-                                  value: ThreeDRService.ConnectionMode.tcp,
+                                  value: ConnectionMode.tcp,
                                   child: const Text('TCP (Réseau)'),
                                 ),
                               ],
@@ -200,7 +200,7 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                             ),
                             const SizedBox(height: 16),
                             // Paramètres selon le mode
-                            if (_selectedMode == ThreeDRService.ConnectionMode.serial)
+                            if (_selectedMode == ConnectionMode.serial)
                               Column(
                                 children: [
                                   TextField(

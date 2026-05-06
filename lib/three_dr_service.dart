@@ -4,6 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'data_model.dart';
 
+/// Mode de connexion pour le module de télémétrie 3DR
+enum ConnectionMode { serial, udp, tcp }
+
 /// Service pour communiquer avec le module de télémétrie radio FPV 3DR
 /// Supporte le protocole MAVLink et la communication UDP/Série
 class ThreeDRService extends ChangeNotifier {
@@ -20,8 +23,6 @@ class ThreeDRService extends ChangeNotifier {
   String remoteHost = "192.168.1.1"; // IP du module 3DR
   int remotePort = 14550; // Port UDP standard MAVLink
   
-  // Mode de connexion
-  enum ConnectionMode { serial, udp, tcp }
   ConnectionMode connectionMode = ConnectionMode.udp;
   
   Timer? _healthCheckTimer;

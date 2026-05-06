@@ -97,7 +97,7 @@ class TelemetryService extends ChangeNotifier {
 
   /// Configure le module 3DR
   void configureThreeDR({
-    required ThreeDRService.ConnectionMode mode,
+    required ConnectionMode mode,
     String? port,
     int? baudRate,
     String? host,
