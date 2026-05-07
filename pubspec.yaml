@@ -39,10 +39,7 @@ dependencies:
   path_provider: ^2.1.5
   share_plus: 12.0.2
   file_picker: ^8.1.6
-  flutter_libserialport: ^0.6.0
-  # Support pour communication série/MAVLink
-  # flutter_libserialport: ^0.2.0  # Optional: pour port série réel
-  # usb_serial: ^0.2.4             # Optional: pour USB réel
+  flutter_libserialport: ^0.6.0  # Pour communication série réelle
 
 dev_dependencies:
   flutter_test:
