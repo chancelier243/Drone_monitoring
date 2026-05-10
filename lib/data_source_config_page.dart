@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'telemetry_service.dart';
 import 'three_dr_service.dart';
+import 'three_dr_device_picker.dart';
 
 class DataSourceConfigPage extends StatefulWidget {
   const DataSourceConfigPage({super.key});
@@ -199,41 +200,121 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                               },
                             ),
                             const SizedBox(height: 16),
-                            // Paramètres selon le mode
+                            // Sélection module USB
                             if (_selectedMode == ConnectionMode.serial)
                               Column(
                                 children: [
-                                  TextField(
-                                    controller: _portController,
-                                    decoration: InputDecoration(
-                                      labelText: 'Port Série',
-                                      hintText: '/dev/ttyUSB0 ou COM3',
-                                      prefixIcon: const Icon(Icons.cable),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final result = await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const ThreeDRDevicePickerPage(),
+                                          ),
+                                        );
+                                        if (result != null && result
+                                            is ThreeDRDevice) {
+                                          setState(() {
+                                            _portController.text =
+                                                result.portName;
+                                          });
+                                        }
+                                      },
+                                      icon: const Icon(Icons.search),
+                                      label: const Text(
+                                          'Détecter Modules 3DR'),
                                     ),
-                                    onChanged: (value) {
-                                      telemetryService.configureThreeDR(
-                                        mode: _selectedMode,
-                                        port: value,
-                                      );
-                                    },
                                   ),
+                                  const SizedBox(height: 12),
+                                  if (telemetryService.threeDRService
+                                      .selectedDevice !=
+                                      null)
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Colors.green,
+                                        ),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.check_circle,
+                                            color: Colors.green,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  telemetryService
+                                                      .threeDRService
+                                                      .selectedDevice!
+                                                      .productName,
+                                                  style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.bold,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  telemetryService
+                                                      .threeDRService
+                                                      .selectedDevice!
+                                                      .portName,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    TextField(
+                                      controller: _portController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Port Série',
+                                        hintText: '/dev/ttyUSB0 ou COM3',
+                                        prefixIcon:
+                                            const Icon(Icons.cable),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                      onChanged: (value) {
+                                        telemetryService.configureThreeDR(
+                                          mode: _selectedMode,
+                                          port: value,
+                                        );
+                                      },
+                                    ),
                                   const SizedBox(height: 12),
                                   TextField(
                                     controller: _remotePortController,
                                     decoration: InputDecoration(
                                       labelText: 'Débit (Baud Rate)',
                                       hintText: '57600',
-                                      prefixIcon: const Icon(Icons.speed),
+                                      prefixIcon:
+                                          const Icon(Icons.speed),
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
                                       ),
                                     ),
                                     keyboardType: TextInputType.number,
                                     onChanged: (value) {
-                                      final baud = int.tryParse(value) ?? 57600;
+                                      final baud =
+                                          int.tryParse(value) ?? 57600;
                                       telemetryService.configureThreeDR(
                                         mode: _selectedMode,
                                         baudRate: baud,
@@ -250,9 +331,11 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                                     decoration: InputDecoration(
                                       labelText: 'Adresse IP',
                                       hintText: '192.168.1.1',
-                                      prefixIcon: const Icon(Icons.language),
+                                      prefixIcon:
+                                          const Icon(Icons.language),
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
                                       ),
                                     ),
                                     onChanged: (value) {
@@ -268,14 +351,17 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                                     decoration: InputDecoration(
                                       labelText: 'Port',
                                       hintText: '14550',
-                                      prefixIcon: const Icon(Icons.outlet),
+                                      prefixIcon:
+                                          const Icon(Icons.outlet),
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
                                       ),
                                     ),
                                     keyboardType: TextInputType.number,
                                     onChanged: (value) {
-                                      final port = int.tryParse(value) ?? 14550;
+                                      final port =
+                                          int.tryParse(value) ?? 14550;
                                       telemetryService.configureThreeDR(
                                         mode: _selectedMode,
                                         remotePort: port,
@@ -284,6 +370,7 @@ class _DataSourceConfigPageState extends State<DataSourceConfigPage> {
                                   ),
                                 ],
                               ),
+
                             const SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
