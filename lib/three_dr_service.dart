@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'data_model.dart';
@@ -83,7 +83,7 @@ class ThreeDRService extends ChangeNotifier {
   /// Obtenir la liste des ports sériels disponibles
   List<String> getAvailablePorts() {
     try {
-      return SerialPort.getAvailablePorts();
+      return SerialPort.availablePorts;
     } catch (e) {
       if (kDebugMode) print("Erreur obtention ports: $e");
       return [];
@@ -100,20 +100,19 @@ class ThreeDRService extends ChangeNotifier {
       for (final port in ports) {
         try {
           final sp = SerialPort(port);
-          final info = SerialPortInfo(port);
           
           // Vérifier si c'est un FTDI (module 3DR)
           // Vendors: FTDI (0x0403), CH340 (0x1A86), Silabs (0x10C4)
-          if (info.vendorId == 0x0403 || 
-              info.vendorId == 0x1A86 || 
-              info.vendorId == 0x10C4) {
+          if (sp.vendorId == 0x0403 || 
+              sp.vendorId == 0x1A86 || 
+              sp.vendorId == 0x10C4) {
             
             final device = ThreeDRDevice(
               portName: port,
-              description: info.description ?? 'Inconnu',
-              vendorId: info.vendorId ?? 0,
-              deviceId: info.deviceId ?? 0,
-              productName: _getProductName(info.vendorId ?? 0, port),
+              description: sp.description ?? 'Inconnu',
+              vendorId: sp.vendorId ?? 0,
+              deviceId: sp.productId ?? 0,
+              productName: _getProductName(sp.vendorId ?? 0, port),
             );
             
             availableDevices.add(device);
@@ -203,8 +202,8 @@ class ThreeDRService extends ChangeNotifier {
       _serialPort!.config.baudRate = baudRate;
       _serialPort!.config.bits = 8;
       _serialPort!.config.stopBits = 1;
-      _serialPort!.config.parity = UartParity.none;
-      _serialPort!.config.setFlowControl(flowControl: SerialPortFlowControl.none);
+      _serialPort!.config.parity = SerialPortParity.none;
+      _serialPort!.config.setFlowControl(SerialPortFlowControl.none);
 
       // Démarrer la lecture
       _reader = SerialPortReader(_serialPort!);
@@ -299,9 +298,7 @@ class ThreeDRService extends ChangeNotifier {
         return null;
       }
 
-      final seq = packet[2];
-      final sysId = packet[3];
-      final compId = packet[4];
+      // ignore unused parameters
       final msgId = packet[5];
       
       // Parser selon le type de message
@@ -373,7 +370,7 @@ class ThreeDRService extends ChangeNotifier {
         
         final vx = _bytesToInt16(data, 20) / 100.0;
         final vy = _bytesToInt16(data, 22) / 100.0;
-        speed = (vx * vx + vy * vy).toDouble().sqrt();
+        speed = sqrt((vx * vx + vy * vy).toDouble());
       } catch (e) {
         if (kDebugMode) print("Erreur parsing GLOBAL_POSITION: $e");
       }

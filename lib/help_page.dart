@@ -614,7 +614,7 @@ class HelpPage extends StatelessWidget {
               style: const TextStyle(fontSize: 13),
             ),
           );
-        }).toList(),
+        }),
         const SizedBox(height: 8),
       ],
     );

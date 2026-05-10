@@ -66,7 +66,7 @@ class _ThreeDRDevicePickerPageState extends State<ThreeDRDevicePickerPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.cable_off, size: 64, color: Colors.grey),
+                      const Icon(Icons.error_outline, size: 64, color: Colors.grey),
                       const SizedBox(height: 16),
                       const Text(
                         'Aucun module 3DR détecté',

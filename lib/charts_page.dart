@@ -28,6 +28,8 @@ class _ChartsPageState extends State<ChartsPage> {
   /// Import un fichier Excel ou CSV
   Future<void> _importFile() async {
     try {
+      final service = Provider.of<TelemetryService>(context, listen: false);
+
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'xlsx'], // Uniquement les formats supportés
@@ -39,8 +41,6 @@ class _ChartsPageState extends State<ChartsPage> {
         final fileExtension = result.files.single.extension?.toLowerCase();
         final bytes =
             result.files.single.bytes!; // On récupère les données brutes
-
-        final service = Provider.of<TelemetryService>(context, listen: false);
 
         try {
           if (fileExtension == 'xlsx') {
@@ -383,10 +383,11 @@ class _ChartsPageState extends State<ChartsPage> {
       final v = extractor(history[i]);
       if (v.isFinite) spots.add(FlSpot(i.toDouble(), v));
     }
-    if (spots.isEmpty)
+    if (spots.isEmpty) {
       return const Center(
         child: Text("Pas de donnees", style: TextStyle(color: Colors.grey)),
       );
+    }
 
     final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
     final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);

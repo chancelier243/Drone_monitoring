@@ -318,7 +318,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
   }
 
   Widget _buildCompassDeclinationCard(BuildContext context, CalibrationService service) {
-    final TextEditingController _controller = TextEditingController(
+    final TextEditingController controller = TextEditingController(
       text: service.calibrationData.compassDeclinationAngle.toString(),
     );
 
@@ -334,7 +334,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
             ),
             const SizedBox(height: 8),
             TextField(
-              controller: _controller,
+              controller: controller,
               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
               decoration: InputDecoration(
                 hintText: "Angle en degrés (ex: -5.5)",

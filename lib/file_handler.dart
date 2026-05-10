@@ -144,6 +144,7 @@ class FileHandler {
   /// Partage un fichier via les applications natives
   static Future<void> shareFile(File file) async {
     try {
+      // ignore: deprecated_member_use
       final result = await Share.shareXFiles(
         [XFile(file.path)],
         text: 'Données de télémétrie du drone',
@@ -172,7 +173,7 @@ class FileHandler {
             if (row.isEmpty) continue;
 
             final telemetryData = TelemetryData(
-              timestamp: DateTime.tryParse(_getCellValueString(row.length > 0 ? row[0]?.value : null)) ?? DateTime.now(),
+              timestamp: DateTime.tryParse(_getCellValueString(row.isNotEmpty ? row[0]?.value : null)) ?? DateTime.now(),
               altitude: double.tryParse(_getCellValueString(row.length > 1 ? row[1]?.value : null)) ?? 0.0,
               speed: double.tryParse(_getCellValueString(row.length > 2 ? row[2]?.value : null)) ?? 0.0,
               temperature: double.tryParse(_getCellValueString(row.length > 3 ? row[3]?.value : null)) ?? 0.0,
@@ -213,7 +214,7 @@ class FileHandler {
           if (fields.isEmpty) continue;
 
           final telemetryData = TelemetryData(
-            timestamp: DateTime.tryParse(fields.length > 0 ? fields[0] : '') ?? DateTime.now(),
+            timestamp: DateTime.tryParse(fields.isNotEmpty ? fields[0] : '') ?? DateTime.now(),
             altitude: double.tryParse(fields.length > 1 ? fields[1] : '') ?? 0.0,
             speed: double.tryParse(fields.length > 2 ? fields[2] : '') ?? 0.0,
             temperature: double.tryParse(fields.length > 3 ? fields[3] : '') ?? 0.0,
