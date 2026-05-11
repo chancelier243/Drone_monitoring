@@ -60,6 +60,9 @@ class ThreeDRService extends ChangeNotifier {
   RawDatagramSocket? _udpSocket;
   StreamSubscription<RawSocketEvent>? _udpSubscription;
   
+  Socket? _tcpSocket;
+  StreamSubscription<List<int>>? _tcpSubscription;
+  
   Timer? _healthCheckTimer;
   DateTime? _lastDataTime;
   
@@ -192,7 +195,7 @@ class ThreeDRService extends ChangeNotifier {
       } else if (connectionMode == ConnectionMode.udp) {
         await _connectUDP();
       } else if (connectionMode == ConnectionMode.tcp) {
-        throw Exception("TCP non encore implémenté");
+        await _connectTCP();
       }
       
       _packetCount = 0;
@@ -291,6 +294,63 @@ class ThreeDRService extends ChangeNotifier {
     if (kDebugMode) print("Connecté en UDP: $remoteHost:$remotePort");
   }
 
+  /// Connecter via TCP (pour Mission Planner)
+  Future<void> _connectTCP() async {
+    if (remoteHost.isEmpty) {
+      throw Exception("Adresse IP vide");
+    }
+
+    try {
+      // Se connecter à Mission Planner via TCP
+      _tcpSocket = await Socket.connect(remoteHost, remotePort);
+      
+      if (kDebugMode) print("Socket TCP connecté à $remoteHost:$remotePort");
+      
+      // Écouter les données entrantes
+      _tcpSubscription = _tcpSocket!.listen(
+        (List<int> data) {
+          try {
+            _onTCPData(Uint8List.fromList(data));
+          } catch (e) {
+            if (kDebugMode) print("Erreur traitement TCP: $e");
+          }
+        },
+        onError: (error) {
+          isConnected = false;
+          errorMessage = "Erreur TCP: $error";
+          if (kDebugMode) print("Erreur TCP: $error");
+          notifyListeners();
+        },
+        onDone: () {
+          isConnected = false;
+          if (kDebugMode) print("Connexion TCP fermée");
+          notifyListeners();
+        },
+      );
+
+      isConnected = true;
+      errorMessage = "";
+      failedAttempts = 0;
+      _lastDataTime = DateTime.now();
+      
+      if (kDebugMode) print("Connecté en TCP: $remoteHost:$remotePort");
+    } catch (e) {
+      throw Exception("Erreur connexion TCP: $e");
+    }
+  }
+
+  /// Gérer les données reçues via TCP
+  void _onTCPData(Uint8List data) {
+    if (!isConnected) return;
+
+    try {
+      // Parser les paquets MAVLink (même format que UDP/série)
+      _parseMAVLinkStream(data);
+      _lastDataTime = DateTime.now();
+    } catch (e) {
+      if (kDebugMode) print("Erreur parsing TCP: $e");
+    }
+  }
 
   /// Gérer les données reçues du port série
   void _onSerialData(Uint8List data) {
@@ -545,7 +605,7 @@ class ThreeDRService extends ChangeNotifier {
     }
   }
 
-  /// Déconnecter du module 3DR (série, UDP, etc.)
+  /// Déconnecter du module 3DR (série, UDP, TCP, etc.)
   Future<void> disconnectFromThreeDR() async {
     try {
       // Fermer la connexion série
@@ -561,6 +621,11 @@ class ThreeDRService extends ChangeNotifier {
       _udpSubscription?.cancel();
       _udpSocket?.close();
       _udpSocket = null;
+      
+      // Fermer la connexion TCP
+      _tcpSubscription?.cancel();
+      await _tcpSocket?.close();
+      _tcpSocket = null;
       
       isConnected = false;
       errorMessage = "";
