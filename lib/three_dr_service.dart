@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'data_model.dart';
@@ -53,6 +55,10 @@ class ThreeDRService extends ChangeNotifier {
   SerialPort? _serialPort;
   SerialPortReader? _reader;
   StreamSubscription? _subscription;
+  
+  // Communication UDP/TCP
+  RawDatagramSocket? _udpSocket;
+  StreamSubscription<RawSocketEvent>? _udpSubscription;
   
   Timer? _healthCheckTimer;
   DateTime? _lastDataTime;
@@ -175,50 +181,21 @@ class ThreeDRService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Connecter au module 3DR sélectionné
+  /// Connecter au module 3DR sélectionné (serial) ou à Mission Planner (UDP/TCP)
   Future<void> connectToThreeDR() async {
-    if (devicePort.isEmpty && selectedDevice == null) {
-      errorMessage = "Aucun appareil sélectionné";
-      notifyListeners();
-      return;
-    }
-
     try {
-      // Utiliser le port du device sélectionné si disponible
-      final port = selectedDevice?.portName ?? devicePort;
+      // Déconnecter les connexions précédentes
+      await disconnectFromThreeDR();
       
-      if (port.isEmpty) {
-        throw Exception("Port non valide");
+      if (connectionMode == ConnectionMode.serial) {
+        await _connectSerial();
+      } else if (connectionMode == ConnectionMode.udp) {
+        await _connectUDP();
+      } else if (connectionMode == ConnectionMode.tcp) {
+        throw Exception("TCP non encore implémenté");
       }
-
-      // Ouvrir le port série
-      _serialPort = SerialPort(port);
       
-      if (!_serialPort!.openReadWrite()) {
-        throw Exception("Impossible d'ouvrir le port $port");
-      }
-
-      // Configurer les paramètres du port
-      _serialPort!.config.baudRate = baudRate;
-      _serialPort!.config.bits = 8;
-      _serialPort!.config.stopBits = 1;
-      _serialPort!.config.parity = SerialPortParity.none;
-      _serialPort!.config.setFlowControl(SerialPortFlowControl.none);
-
-      // Démarrer la lecture
-      _reader = SerialPortReader(_serialPort!);
-      _subscription = _reader!.stream.listen(
-        _onSerialData,
-        onError: _onSerialError,
-      );
-
-      isConnected = true;
-      errorMessage = "";
-      failedAttempts = 0;
       _packetCount = 0;
-      
-      if (kDebugMode) print("Connecté au port: $port");
-      
       notifyListeners();
     } catch (e) {
       isConnected = false;
@@ -230,6 +207,90 @@ class ThreeDRService extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Connecter via port série
+  Future<void> _connectSerial() async {
+    if (devicePort.isEmpty && selectedDevice == null) {
+      throw Exception("Aucun appareil sélectionné");
+    }
+
+    final port = selectedDevice?.portName ?? devicePort;
+    
+    if (port.isEmpty) {
+      throw Exception("Port non valide");
+    }
+
+    _serialPort = SerialPort(port);
+    
+    if (!_serialPort!.openReadWrite()) {
+      throw Exception("Impossible d'ouvrir le port $port");
+    }
+
+    _serialPort!.config.baudRate = baudRate;
+    _serialPort!.config.bits = 8;
+    _serialPort!.config.stopBits = 1;
+    _serialPort!.config.parity = SerialPortParity.none;
+    _serialPort!.config.setFlowControl(SerialPortFlowControl.none);
+
+    _reader = SerialPortReader(_serialPort!);
+    _subscription = _reader!.stream.listen(
+      _onSerialData,
+      onError: _onSerialError,
+    );
+
+    isConnected = true;
+    errorMessage = "";
+    failedAttempts = 0;
+    
+    if (kDebugMode) print("Connecté au port série: $port");
+  }
+
+  /// Connecter via UDP (pour Mission Planner)
+  Future<void> _connectUDP() async {
+    if (remoteHost.isEmpty) {
+      throw Exception("Adresse IP vide");
+    }
+
+    // Se connecter à Mission Planner (localhost:14550 par défaut)
+    _udpSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+    
+    if (kDebugMode) print("Socket UDP créé sur le port ${_udpSocket!.port}");
+    
+    // Écouter les données entrantes
+    _udpSubscription = _udpSocket!.listen(
+      (RawSocketEvent event) {
+        if (event == RawSocketEvent.read) {
+          try {
+            final datagram = _udpSocket!.receive();
+            if (datagram != null) {
+              _onUDPData(datagram.data);
+            }
+          } catch (e) {
+            if (kDebugMode) print("Erreur lecture UDP: $e");
+          }
+        }
+      },
+      onError: (error) {
+        isConnected = false;
+        errorMessage = "Erreur UDP: $error";
+        if (kDebugMode) print("Erreur UDP: $error");
+        notifyListeners();
+      },
+      onDone: () {
+        isConnected = false;
+        if (kDebugMode) print("Socket UDP fermé");
+        notifyListeners();
+      },
+    );
+
+    isConnected = true;
+    errorMessage = "";
+    failedAttempts = 0;
+    _lastDataTime = DateTime.now();
+    
+    if (kDebugMode) print("Connecté en UDP: $remoteHost:$remotePort");
+  }
+
 
   /// Gérer les données reçues du port série
   void _onSerialData(Uint8List data) {
@@ -252,6 +313,19 @@ class ThreeDRService extends ChangeNotifier {
     if (kDebugMode) print("Erreur série 3DR: $error");
     
     notifyListeners();
+  }
+
+  /// Gérer les données reçues via UDP
+  void _onUDPData(Uint8List data) {
+    if (!isConnected) return;
+
+    try {
+      // Parser les paquets MAVLink (même format que série)
+      _parseMAVLinkStream(data);
+      _lastDataTime = DateTime.now();
+    } catch (e) {
+      if (kDebugMode) print("Erreur parsing UDP: $e");
+    }
   }
 
   /// Parser le flux de données MAVLink
@@ -471,9 +545,10 @@ class ThreeDRService extends ChangeNotifier {
     }
   }
 
-  /// Déconnecter du module 3DR
+  /// Déconnecter du module 3DR (série, UDP, etc.)
   Future<void> disconnectFromThreeDR() async {
     try {
+      // Fermer la connexion série
       _subscription?.cancel();
       _reader = null;
       
@@ -481,6 +556,11 @@ class ThreeDRService extends ChangeNotifier {
         _serialPort!.close();
         _serialPort = null;
       }
+      
+      // Fermer la connexion UDP
+      _udpSubscription?.cancel();
+      _udpSocket?.close();
+      _udpSocket = null;
       
       isConnected = false;
       errorMessage = "";
