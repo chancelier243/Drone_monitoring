@@ -129,8 +129,18 @@ class TelemetryService extends ChangeNotifier {
       // Copie les données du service 3DR
       if (threeDRService.currentData != null) {
         currentData = threeDRService.currentData;
-        history.addAll(threeDRService.history
-            .where((data) => !history.contains(data)));
+        
+        // Synchroniser l'historique: les données du 3DR remplacent l'historique du TelemetryService
+        // puisque c'est la source unique de données
+        if (threeDRService.history.isNotEmpty) {
+          // Garder les nouvelles données depuis la dernière synchronisation
+          final lastIndex = history.length;
+          if (lastIndex < threeDRService.history.length) {
+            history.addAll(
+              threeDRService.history.sublist(lastIndex)
+            );
+          }
+        }
         
         // Limiter l'historique
         if (history.length > 300) {

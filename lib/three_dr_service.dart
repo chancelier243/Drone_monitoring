@@ -47,6 +47,11 @@ class ThreeDRService extends ChangeNotifier {
   
   ConnectionMode connectionMode = ConnectionMode.serial;
   
+  // Accumulation progressive des données MAVLink
+  // Pour éviter les données partielles, on accumule les paquets
+  late Map<String, dynamic> _mavLinkDataAccumulator;
+  DateTime? _lastAccumulatorReset;
+  
   // Ports et modules détectés
   List<ThreeDRDevice> availableDevices = [];
   ThreeDRDevice? selectedDevice;
@@ -86,7 +91,26 @@ class ThreeDRService extends ChangeNotifier {
   }
 
   ThreeDRService() {
+    _initializeMAVLinkAccumulator();
     _initializeHealthCheck();
+  }
+  
+  /// Initialiser l'accumulateur MAVLink
+  void _initializeMAVLinkAccumulator() {
+    _mavLinkDataAccumulator = {
+      'pitch': 0.0,
+      'roll': 0.0,
+      'yaw': 0.0,
+      'altitude': 0.0,
+      'speed': 0.0,
+      'battery': 100.0,
+      'temperature': 25.0,
+      'accelX': 0.0,
+      'accelY': 0.0,
+      'accelZ': 0.0,
+      'pressure': 1013.25,
+    };
+    _lastAccumulatorReset = DateTime.now();
   }
 
   /// Obtenir la liste des ports sériels disponibles
@@ -400,19 +424,32 @@ class ThreeDRService extends ChangeNotifier {
           // Vérifier qu'on a le paquet complet
           if (i + 6 + length + 2 <= data.length) {
             final packet = data.sublist(i, i + 6 + length + 2);
-            final parsed = _parseMAVLinkPacket(packet);
+            _parseMAVLinkPacket(packet); // Accumule les données
+            _packetCount++;
             
-            if (parsed != null) {
-              currentData = parsed;
-              history.add(parsed);
-              
-              // Limiter l'historique à 300 points
-              if (history.length > 300) {
-                history.removeAt(0);
+            // Créer une TelemetryData complète tous les 50ms ou après 3 messages
+            if (_packetCount % 3 == 0 || 
+                DateTime.now().difference(_lastAccumulatorReset!).inMilliseconds > 50) {
+              final completeData = _createTelemetryDataFromAccumulator();
+              if (completeData != null) {
+                currentData = completeData;
+                history.add(completeData);
+                
+                // Limiter l'historique à 300 points
+                if (history.length > 300) {
+                  history.removeAt(0);
+                }
+                
+                _lastAccumulatorReset = DateTime.now();
+                notifyListeners();
+                
+                if (kDebugMode) {
+                  print('[3DR] Donnée complète: alt=${completeData.altitude.toStringAsFixed(1)}m, '
+                      'spd=${completeData.speed.toStringAsFixed(1)}m/s, '
+                      'bat=${completeData.battery.toStringAsFixed(0)}%, '
+                      'pitch=${completeData.pitch.toStringAsFixed(1)}°');
+                }
               }
-              
-              _packetCount++;
-              notifyListeners();
             }
           }
         }
@@ -420,75 +457,93 @@ class ThreeDRService extends ChangeNotifier {
     }
   }
 
-  /// Parser un paquet MAVLink individuel
-  TelemetryData? _parseMAVLinkPacket(Uint8List packet) {
+  /// Créer une TelemetryData complète à partir de l'accumulateur
+  TelemetryData? _createTelemetryDataFromAccumulator() {
+    try {
+      return TelemetryData(
+        timestamp: DateTime.now(),
+        pitch: _mavLinkDataAccumulator['pitch'] as double? ?? 0.0,
+        roll: _mavLinkDataAccumulator['roll'] as double? ?? 0.0,
+        yaw: _mavLinkDataAccumulator['yaw'] as double? ?? 0.0,
+        altitude: _mavLinkDataAccumulator['altitude'] as double? ?? 0.0,
+        speed: _mavLinkDataAccumulator['speed'] as double? ?? 0.0,
+        battery: _mavLinkDataAccumulator['battery'] as double? ?? 100.0,
+        temperature: _mavLinkDataAccumulator['temperature'] as double? ?? 25.0,
+        accelX: _mavLinkDataAccumulator['accelX'] as double? ?? 0.0,
+        accelY: _mavLinkDataAccumulator['accelY'] as double? ?? 0.0,
+        accelZ: _mavLinkDataAccumulator['accelZ'] as double? ?? 0.0,
+        pressure: _mavLinkDataAccumulator['pressure'] as double? ?? 1013.25,
+      );
+    } catch (e) {
+      if (kDebugMode) print("Erreur création donnée complète: $e");
+      return null;
+    }
+  }
+
+  /// Parser un paquet MAVLink individuel et mettre à jour l'accumulateur
+  void _parseMAVLinkPacket(Uint8List packet) {
     try {
       if (packet.length < 8 || packet[0] != 0xFE) {
-        return null;
+        return;
       }
 
       final length = packet[1];
       if (packet.length < 6 + length + 2) {
-        return null;
+        return;
       }
 
       // ignore unused parameters
       final msgId = packet[5];
       
-      // Parser selon le type de message
+      // Parser selon le type de message et mettre à jour l'accumulateur
       switch (msgId) {
         case 30: // ATTITUDE
-          return _parseAttitude(packet);
+          _parseAttitude(packet);
+          break;
         case 33: // GLOBAL_POSITION_INT
-          return _parseGlobalPositionInt(packet);
+          _parseGlobalPositionInt(packet);
+          break;
         case 42: // POWER_STATUS
-          return _parsePowerStatus(packet);
+          _parsePowerStatus(packet);
+          break;
         case 24: // GPS_RAW_INT
-          return _parseGPSRawInt(packet);
-        default:
-          return null;
+          _parseGPSRawInt(packet);
+          break;
       }
     } catch (e) {
       if (kDebugMode) print("Erreur parsing paquet: $e");
-      return null;
     }
   }
 
-  /// Parser message ATTITUDE (msgId 30)
-  TelemetryData _parseAttitude(Uint8List packet) {
-    double roll = 0, pitch = 0, yaw = 0;
-    
-    if (packet.length >= 17) {
-      try {
+  /// Parser message ATTITUDE (msgId 30) et mettre à jour l'accumulateur
+  void _parseAttitude(Uint8List packet) {
+    try {
+      double roll = 0, pitch = 0, yaw = 0;
+      
+      if (packet.length >= 17) {
         // Offset 6 = payload start
         // Format: F F F (3x float32 radians) + F F F (3x float32 rad/s)
         final data = packet.sublist(6);
         roll = _bytesToFloat32(data, 0);
         pitch = _bytesToFloat32(data, 4);
         yaw = _bytesToFloat32(data, 8);
-      } catch (e) {
-        if (kDebugMode) print("Erreur parsing ATTITUDE: $e");
+        
+        // Mettre à jour l'accumulateur (conversion radians -> degrés)
+        _mavLinkDataAccumulator['pitch'] = pitch * 180 / 3.14159;
+        _mavLinkDataAccumulator['roll'] = roll * 180 / 3.14159;
+        _mavLinkDataAccumulator['yaw'] = yaw * 180 / 3.14159;
       }
+    } catch (e) {
+      if (kDebugMode) print("Erreur parsing ATTITUDE: $e");
     }
-
-    return TelemetryData(
-      timestamp: DateTime.now(),
-      pitch: pitch * 180 / 3.14159, // Convertir en degrés
-      roll: roll * 180 / 3.14159,
-      yaw: yaw * 180 / 3.14159,
-      altitude: currentData?.altitude ?? 0.0,
-      speed: currentData?.speed ?? 0.0,
-      battery: currentData?.battery ?? 100.0,
-      temperature: currentData?.temperature ?? 25.0,
-    );
   }
 
-  /// Parser message GLOBAL_POSITION_INT (msgId 33)
-  TelemetryData _parseGlobalPositionInt(Uint8List packet) {
-    double altitude = 0, speed = 0;
-    
-    if (packet.length >= 32) {
-      try {
+  /// Parser message GLOBAL_POSITION_INT (msgId 33) et mettre à jour l'accumulateur
+  void _parseGlobalPositionInt(Uint8List packet) {
+    try {
+      double altitude = 0, speed = 0;
+      
+      if (packet.length >= 32) {
         final data = packet.sublist(6);
         // Uint32 time_boot_ms (offset 0)
         // Int32 lat (offset 4)
@@ -505,29 +560,22 @@ class ThreeDRService extends ChangeNotifier {
         final vx = _bytesToInt16(data, 20) / 100.0;
         final vy = _bytesToInt16(data, 22) / 100.0;
         speed = sqrt((vx * vx + vy * vy).toDouble());
-      } catch (e) {
-        if (kDebugMode) print("Erreur parsing GLOBAL_POSITION: $e");
+        
+        // Mettre à jour l'accumulateur
+        _mavLinkDataAccumulator['altitude'] = altitude;
+        _mavLinkDataAccumulator['speed'] = speed;
       }
+    } catch (e) {
+      if (kDebugMode) print("Erreur parsing GLOBAL_POSITION: $e");
     }
-
-    return TelemetryData(
-      timestamp: DateTime.now(),
-      pitch: currentData?.pitch ?? 0.0,
-      roll: currentData?.roll ?? 0.0,
-      yaw: currentData?.yaw ?? 0.0,
-      altitude: altitude,
-      speed: speed,
-      battery: currentData?.battery ?? 100.0,
-      temperature: currentData?.temperature ?? 25.0,
-    );
   }
 
-  /// Parser message POWER_STATUS (msgId 42)
-  TelemetryData _parsePowerStatus(Uint8List packet) {
-    double battery = 100.0;
-    
-    if (packet.length >= 12) {
-      try {
+  /// Parser message POWER_STATUS (msgId 42) et mettre à jour l'accumulateur
+  void _parsePowerStatus(Uint8List packet) {
+    try {
+      double battery = 100.0;
+      
+      if (packet.length >= 12) {
         final data = packet.sublist(6);
         // Uint16 Vcc (offset 0) - voltage in mV
         // Uint16 Vservo (offset 2)
@@ -536,35 +584,27 @@ class ThreeDRService extends ChangeNotifier {
         final vcc = _bytesToInt16(data, 0);
         battery = (vcc / 1000.0) * 50.0; // Convertir en pourcentage
         battery = battery.clamp(0, 100).toDouble();
-      } catch (e) {
-        if (kDebugMode) print("Erreur parsing POWER_STATUS: $e");
+        
+        // Mettre à jour l'accumulateur
+        _mavLinkDataAccumulator['battery'] = battery;
       }
+    } catch (e) {
+      if (kDebugMode) print("Erreur parsing POWER_STATUS: $e");
     }
-
-    return TelemetryData(
-      timestamp: DateTime.now(),
-      pitch: currentData?.pitch ?? 0.0,
-      roll: currentData?.roll ?? 0.0,
-      yaw: currentData?.yaw ?? 0.0,
-      altitude: currentData?.altitude ?? 0.0,
-      speed: currentData?.speed ?? 0.0,
-      battery: battery,
-      temperature: currentData?.temperature ?? 25.0,
-    );
   }
 
-  /// Parser message GPS_RAW_INT (msgId 24)
-  TelemetryData _parseGPSRawInt(Uint8List packet) {
-    return TelemetryData(
-      timestamp: DateTime.now(),
-      pitch: currentData?.pitch ?? 0.0,
-      roll: currentData?.roll ?? 0.0,
-      yaw: currentData?.yaw ?? 0.0,
-      altitude: currentData?.altitude ?? 0.0,
-      speed: currentData?.speed ?? 0.0,
-      battery: currentData?.battery ?? 100.0,
-      temperature: currentData?.temperature ?? 25.0,
-    );
+  /// Parser message GPS_RAW_INT (msgId 24) et mettre à jour l'accumulateur
+  void _parseGPSRawInt(Uint8List packet) {
+    try {
+      // Ne pas faire grand chose pour l'instant, juste valider le message
+      if (packet.length < 35) {
+        return;
+      }
+      // Les données GPS peuvent être utilisées pour mettre à jour la position
+      // mais ce n'est pas nécessaire pour la télémétrie basique
+    } catch (e) {
+      if (kDebugMode) print("Erreur parsing GPS: $e");
+    }
   }
 
   /// Convertir bytes en float32 (little-endian)
