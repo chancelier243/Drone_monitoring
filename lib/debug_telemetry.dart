@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'telemetry_service.dart';
-import 'data_model.dart';
 
 /// Utilitaire de debug pour tracer les données MAVLink
 class DebugTelemetry {
